@@ -7,7 +7,7 @@ var storageAccountKey = 'ACCOUNT_KEY';
 var azure = require('azure-storage');
 var blobService = azure.createBlobService(storageAccountName, storageAccountKey);
 
-blobService.createBlockBlobFromLocalFile('assets/photos', 'image_19.jpg', 'photos/image_19.jpg', (err, result, response) => {
+blobService.createBlockBlobFromLocalFile('photos', 'image_19.jpg', 'assets/photos/image_19.jpg', (err, result, response) => {
     if (err) {
         console.log('Error uploading blob: ' + err);
     }
