@@ -73,7 +73,7 @@ class Camera {
     }
 
     upload(imageFileName, callback) {
-        this._blobService.createBlockBlobFromLocalFile('photos', imageFileName, 'assets/photos/' + imageFileName, (err, result) => {
+        this._blobService.createBlockBlobFromLocalFile('photos', imageFileName, 'photos/' + imageFileName, (err, result) => {
             callback(err, result);
         });
     }
