@@ -1,6 +1,9 @@
-// TODO: replace the following values with the names and keys from your accounts.
-var iotHubName = 'HUB_NAME';
-var storageAccountName = 'ACCOUNT_NAME';
+// TODO: this assumes you set the environment variables for these values.
+// If not, replace the value with the proper text.
+var iotHubName = process.env.HUB_NAME;
+var storageAccountName = process.env.ACCOUNT_NAME;
+
+// TODO: replace the following value with the storage account key.
 var storageAccountKey = 'ACCOUNT_KEY';
 
 // Upload an image to blob storage

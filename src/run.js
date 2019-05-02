@@ -1,7 +1,11 @@
 'use strict';
 
-var iotHubName = 'HUB_NAME';
-var storageAccountName = 'ACCOUNT_NAME';
+// TODO: this assumes you set the environment variables for these values.
+// If not, replace the value with the proper text.
+var iotHubName = process.env.HUB_NAME;
+var storageAccountName = process.env.ACCOUNT_NAME;
+
+// TODO: replace the following value with the storage account key.
 var storageAccountKey = 'ACCOUNT_KEY';
 
 class Camera {
@@ -73,7 +77,7 @@ class Camera {
     }
 
     upload(imageFileName, callback) {
-        this._blobService.createBlockBlobFromLocalFile('photos', imageFileName, 'photos/' + imageFileName, (err, result) => {
+        this._blobService.createBlockBlobFromLocalFile('photos', imageFileName, 'assets/photos/' + imageFileName, (err, result) => {
             callback(err, result);
         });
     }
@@ -100,7 +104,7 @@ class Camera {
 // Load image file names
 var fs = require('fs');
 
-fs.readdir('photos', (err, files) => {
+fs.readdir('assets/photos', (err, files) => {
     // Create an array of cameras
     var cameras = JSON.parse(fs.readFileSync('cameras.json', 'utf8')).map(
         camera => new Camera(
