@@ -1,131 +1,72 @@
 'use strict';
 
-// TODO: this assumes you set the environment variables for these values.
-// If not, replace the value with the proper text.
-var iotHubName = process.env.HUB_NAME;
-var storageAccountName = process.env.ACCOUNT_NAME;
+// Connect to the storage account
+var storage = require('azure-storage');
 
-// TODO: replace the following value with the storage account key.
-var storageAccountKey = 'ACCOUNT_KEY';
+var blobService = storage.createBlobService(
+    process.env.ACCOUNT_NAME,
+    process.env.ACCOUNT_KEY
+);
 
-class Camera {
-    constructor(id, latitude, longitude, key, files) {
-        this._id = id;
-        this._latitude = latitude;
-        this._longitude = longitude;
-        this._key = key;
-        this._files = files.slice(0);
-        this._ready = false;
-    }
-
-    get id() {
-        return this._id;
-    }
-
-    connect(iotHubName, storageAccountName, storageAccountKey, callback) {
-        // Connect to blob storage
-        var azure = require('azure-storage');
-        this._storageAccountName = storageAccountName;
-        this._blobService = azure.createBlobService(storageAccountName, storageAccountKey);
-
-        // Connect to the IoT hub
-        var connectionString = 'HostName=' + iotHubName + '.azure-devices.net;DeviceId=' + this._id + ';SharedAccessKey=' + this._key;
-        var clientFromConnectionString = require('azure-iot-device-mqtt').clientFromConnectionString;
-        this._client = clientFromConnectionString(connectionString);
-
-        this._client.open((err) => {
-            if (!err) {
-                this._ready = true;
-            }
-
-            callback(this._ready);
-        });
-    }
-
-    start() {
-        // Register first callback for 5 to 60 seconds
-        setTimeout(this.timer, (Math.random() * 55000) + 5000, this);
-    }
-
-    timer(self) {
-        if (self._ready === true) {
-            // "Trigger" the camera with a random photo
-            var index = Math.floor(Math.random() * self._files.length);
-            self.trigger(self._files[index], (err, result) => {});
-
-            // Register another callback for 5 to 60 seconds
-            setTimeout(self.timer, (Math.random() * 55000) + 5000, self);
-        }
-    }
-
-    trigger(imageFileName, callback) {
-        if (this._ready === true) {
-            // Upload the image to blob storage
-            this.upload(imageFileName, (err, result) => {
-                if (err) {
-                    callback(err, result);
-                }
-                else {
-                    // Send an event to the IoT hub
-                    this.send(imageFileName, (err, result) => {
-                        console.log(this._id + ': https://' + this._storageAccountName + '.blob.core.windows.net/photos/' + imageFileName);
-                        callback(err, result);
-                    });
-                }
-            });
-        }
-    }
-
-    upload(imageFileName, callback) {
-        this._blobService.createBlockBlobFromLocalFile('photos', imageFileName, 'assets/photos/' + imageFileName, (err, result) => {
-            callback(err, result);
-        });
-    }
-
-    send(imageFileName, callback) {
-        var Message = require('azure-iot-device').Message;
-
-        var data = {
-            'deviceId' : this._id,
-            'latitude' : this._latitude,
-            'longitude' : this._longitude,
-            'url' : 'https://' + this._storageAccountName + '.blob.core.windows.net/photos/' + imageFileName,
-            'timestamp' : new Date().toISOString()
-        };
-
-        var message = new Message(JSON.stringify(data));
-
-        this._client.sendEvent(message, (err, result) => {
-            callback(err, result);
-        });
-    }
-}
-
-// Load image file names
+// Load image file names and create an array of cameras
 var fs = require('fs');
 
-fs.readdir('assets/photos', (err, files) => {
-    // Create an array of cameras
+fs.readdir('photos', (err, files) => {
     var cameras = JSON.parse(fs.readFileSync('cameras.json', 'utf8')).map(
         camera => new Camera(
             camera.deviceId,
             camera.latitude,
             camera.longitude,
-            camera.key,
+            blobService,
             files
         )
     );
 
     // Start the cameras
     cameras.forEach(camera => {
-        camera.connect(iotHubName, storageAccountName, storageAccountKey, status => {
-            if (status === true) {
-                console.log(camera.id + ' connected');
-                camera.start();
-            }
-            else {
-                console.log(camera.id + ' failed to connect');
-            }
-        })
+        camera.start();
     });
 });
+
+class Camera {
+    constructor(id, latitude, longitude, blobService, files) {
+        this._id = id;
+        this._latitude = latitude;
+        this._longitude = longitude;
+        this._blobService = blobService;
+        this._files = files.slice(0);
+        this._interval = 300000;
+    }
+
+    start() {
+        // Register first callback
+        setTimeout(this.timer, Math.random() * this._interval, this);
+        console.log('Started ' + this._id);
+    }
+
+    timer(self) {
+        // Randomly select a photo
+        var index = Math.floor(Math.random() * self._files.length);
+        var filename = self._files[index]
+
+        // Define the metadata to be written to the blob
+        var metadata = {
+            'latitude': self._latitude,
+            'longitude': self._longitude,
+            'id': self._id
+        };
+
+        // Upload the blob
+        self._blobService.createBlockBlobFromLocalFile('photos', filename, 'photos/' + filename, { 'metadata': metadata }, (err, result) => {
+            if (!err) {
+                console.log(self._id + ': Uploaded ' + filename);
+            }
+            else {
+                console.log(self._id + ': Error uploading ' + filename);
+            }
+        });
+
+        // Register the next callback
+        setTimeout(self.timer, Math.random() * self._interval, self);
+    }
+}
